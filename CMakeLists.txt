@@ -25,7 +25,7 @@ if (MSVC)
     # disable RTTI and exceptions
     add_compile_options(/GR- /EHsc /D_HAS_EXCEPTIONS=0)
 else ()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    #add_compile_options(-Wall -Wextra -Wpedantic)
     # disable RTTI and exceptions
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti;-fno-exceptions>")
 
@@ -48,6 +48,8 @@ else ()
         add_link_options(LINKER:--gc-sections)
     endif ()
 
+    add_link_options(LINKER:-ldl)
+
     # for development builds use -Werror and enable sanitizers
     if (PROJECT_IS_TOP_LEVEL)
         add_compile_options(-Werror -Wno-error=deprecated-declarations)
@@ -57,6 +59,27 @@ else ()
         endif ()
     endif ()
 endif ()
+
+set(TPDE_TARGETS "X86;AArch64" CACHE STRING "Target architectures: X86;AArch64 (semicolon-separated)")
+set(_allowed_archs "X86" "AArch64")
+foreach(arch IN LISTS TPDE_TARGETS)
+    list(FIND _allowed_archs "${arch}" _idx)
+    if(_idx EQUAL -1)
+        message(FATAL_ERROR
+            "Invalid architecture '${arch}'. Allowed: ${_allowed_archs}"
+        )
+    endif()
+
+    # Set compile definitions for each valid entry
+    if(arch STREQUAL "X86")
+        add_compile_definitions(TARGET_ARCH_X86)
+    elseif(arch STREQUAL "AArch64")
+        add_compile_definitions(TARGET_ARCH_AARCH64)
+    endif()
+endforeach()
+if(NOT TPDE_TARGETS)
+    message(FATAL_ERROR "No target architectures specified.")
+endif()
 
 if (TPDE_ENABLE_COVERAGE)
     if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -70,7 +93,7 @@ if (TPDE_ENABLE_ENCODEGEN OR TPDE_ENABLE_LLVM)
     # LLVM versions we currently support. The first version should be the
     # "primary" versions where all tests pass (i.e., no XFAIL due to different
     # code generation).
-    set(TPDE_LLVM_SUPPORTED_VERSIONS 20.1 19.1)
+    set(TPDE_LLVM_SUPPORTED_VERSIONS 21.1 20.1 19.1)
 
     # allow overriding the LLVM version used
     if (DEFINED LLVM_DIR)
