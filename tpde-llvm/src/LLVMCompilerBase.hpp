@@ -182,6 +182,8 @@ struct LLVMCompilerBase : public LLVMCompiler,
     ceil,
     roundf,
     round,
+    nearbyintf,
+    nearbyint,
     rintf,
     rint,
     memcpy,
@@ -1202,6 +1204,8 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::ceil: name = "ceil"; break;
   case LibFunc::roundf: name = "roundf"; break;
   case LibFunc::round: name = "round"; break;
+  case LibFunc::nearbyintf: name = "nearbyintf"; break;
+  case LibFunc::nearbyint: name = "nearbyint"; break;
   case LibFunc::rintf: name = "rintf"; break;
   case LibFunc::rint: name = "rint"; break;
   case LibFunc::memcpy: name = "memcpy"; break;
@@ -4530,6 +4534,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
   case llvm::Intrinsic::floor:
   case llvm::Intrinsic::ceil:
   case llvm::Intrinsic::round:
+  case llvm::Intrinsic::nearbyint:
   case llvm::Intrinsic::rint:
   case llvm::Intrinsic::trunc:
   case llvm::Intrinsic::pow:
@@ -4553,6 +4558,9 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     case floor: func = is_double ? LibFunc::floor : LibFunc::floorf; break;
     case ceil: func = is_double ? LibFunc::ceil : LibFunc::ceilf; break;
     case round: func = is_double ? LibFunc::round : LibFunc::roundf; break;
+    case nearbyint:
+      func = is_double ? LibFunc::nearbyint : LibFunc::nearbyintf;
+      break;
     case rint: func = is_double ? LibFunc::rint : LibFunc::rintf; break;
     case trunc: func = is_double ? LibFunc::trunc : LibFunc::truncf; break;
     case pow: func = is_double ? LibFunc::pow : LibFunc::powf; break;
