@@ -640,10 +640,24 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::ValuePart
     TPDE_FATAL("non-sequential vector constants should not be legal");
   }
 
+  const auto handle_splat_constant = [this, ty, size, bank](u64 splat_val) {
+    auto [nelem, scalar] = basic_ty_vector_info(ty);
+    unsigned elemsz = size / nelem;
+    // Always allocate one extra u64 to simplify copying.
+    u64 *copy = new (const_allocator) u64[size / 8 + 1];
+    for (unsigned i = 0; i < size; i += elemsz) {
+      std::memcpy(reinterpret_cast<u8 *>(copy) + i, &splat_val, sizeof(u64));
+    }
+    return ValuePart(copy, size, bank);
+  };
+
   if (const auto *const_int = llvm::dyn_cast<llvm::ConstantInt>(const_val)) {
     assert(sub_part < (ty == LLVMBasicValType::i128 ? 2 : 1));
     assert(size <= 8 && "multi-word integer as single part?");
     const u64 *data = const_int->getValue().getRawData();
+    if (ty >= LLVMBasicValType::v8i8) [[unlikely]] {
+      return handle_splat_constant(data[0]);
+    }
     return ValuePart(data[sub_part], size, bank);
   }
 
@@ -652,6 +666,10 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::ValuePart
     // APFloat has no bitwise storage of the floating-point number and
     // bitcastToAPInt constructs a new APInt, so we need to copy the value.
     llvm::APInt int_val = const_fp->getValue().bitcastToAPInt();
+    if (ty >= LLVMBasicValType::v8i8) [[unlikely]] {
+      assert(int_val.getNumWords() == 1 && "multi-word vector fp element?");
+      return handle_splat_constant(int_val.getZExtValue());
+    }
     u64 *data = new (const_allocator) u64[int_val.getNumWords()];
     std::memcpy(
         data, int_val.getRawData(), int_val.getNumWords() * sizeof(u64));
