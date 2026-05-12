@@ -210,6 +210,8 @@ struct LLVMCompilerBase : public LLVMCompiler,
     expf,
     exp2,
     exp2f,
+    modf,
+    modff,
     trunctfsf2,
     trunctfdf2,
     extendsftf2,
@@ -1232,6 +1234,8 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::expf: name = "expf"; break;
   case LibFunc::exp2: name = "exp2"; break;
   case LibFunc::exp2f: name = "exp2f"; break;
+  case LibFunc::modf: name = "modf"; break;
+  case LibFunc::modff: name = "modff"; break;
   case LibFunc::trunctfsf2: name = "__trunctfsf2"; break;
   case LibFunc::trunctfdf2: name = "__trunctfdf2"; break;
   case LibFunc::extendsftf2: name = "__extendsftf2"; break;
@@ -4583,6 +4587,47 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     derived()->create_helper_call(ops, &res_vr, get_libfunc_sym(func));
     return true;
   }
+#if LLVM_VERSION_MAJOR >= 21
+  case llvm::Intrinsic::modf: {
+    llvm::Value *arg = inst->getArgOperand(0);
+    const auto is_double = arg->getType()->isDoubleTy();
+    if (!is_double && !arg->getType()->isFloatTy()) {
+      return false;
+    }
+
+    auto cb = derived()->create_call_builder(inst);
+    if (!cb) {
+      return false;
+    }
+
+    // modf is tricky. The LLVM intrinsic returns two values as struct. The C
+    // function, however, returns a single value in a register and the second
+    // value via an output parameter to an address. We have to allocate a stack
+    // slot (we reuse the spill slot of the result) and pass the address of this
+    // stack slot as parameter.
+    cb->add_arg(typename Derived::CallArg{arg});
+
+    ValueRef res = this->result_ref(inst);
+    assert(res.assignment()->part_count == 2);
+    tpde::AssignmentPartRef int_part{res.assignment(), 1};
+    this->allocate_spill_slot(int_part);
+    int_part.set_stack_valid();
+
+    // Compute address and store this into a ValuePart.
+    // TODO: this is rather ugly, is there a better way?
+    GenericValuePart int_part_slot = derived()->val_spill_slot(int_part);
+    (void)derived()->gval_expr_as_reg(int_part_slot);
+    ValuePart int_part_slot_vp;
+    int_part_slot_vp.set_value(
+        derived(), std::move(std::get<ScratchReg>(int_part_slot.state)));
+    cb->add_arg(std::move(int_part_slot_vp),
+                tpde::CCAssignment{.bank = Config::GP_BANK, .size = 8});
+
+    cb->call(get_libfunc_sym(is_double ? LibFunc::modf : LibFunc::modff));
+    cb->add_ret(res.part(0), {});
+    return true;
+  }
+#endif
   case llvm::Intrinsic::minnum:
   case llvm::Intrinsic::maxnum:
   case llvm::Intrinsic::copysign: {
