@@ -270,9 +270,8 @@ bool LLVMCompilerX64::compile_cond_br(const llvm::Instruction *inst,
 
 bool LLVMCompilerX64::compile_inline_asm(const llvm::CallBase *call) {
   auto inline_asm = llvm::cast<llvm::InlineAsm>(call->getCalledOperand());
-  // TODO: handle inline assembly that actually does something
-  if (!inline_asm->getAsmString().empty() || inline_asm->isAlignStack() ||
-      !call->getType()->isVoidTy() || call->arg_size() != 0) {
+  if (inline_asm->isAlignStack() || !call->getType()->isVoidTy() ||
+      call->arg_size() != 0) {
     return false;
   }
 
@@ -289,7 +288,16 @@ bool LLVMCompilerX64::compile_inline_asm(const llvm::CallBase *call) {
     }
   }
 
-  return true;
+  if (inline_asm->getAsmString().empty()) {
+    return true;
+  } else if (inline_asm->getAsmString() == "int3") {
+    // SPEC hack.
+    ASM(INT3);
+    return true;
+  }
+
+  // TODO: handle inline assembly that actually does something
+  return false;
 }
 
 bool LLVMCompilerX64::compile_icmp(const llvm::Instruction *inst,

@@ -6,11 +6,13 @@
 
 define void @inlineasm() {
 ; X64-LABEL: <inlineasm>:
-; X64:         ret
+; X64:         int3
+; X64-NEXT:    ret
   call void asm "", "~{dirflag},~{fpsr},~{flags}"()
   call void asm sideeffect "", "~{dirflag},~{fpsr},~{flags}"()
   call void asm unwind "", "~{dirflag},~{fpsr},~{flags}"()
   call void asm sideeffect "", "~{memory},~{dirflag},~{fpsr},~{flags}"()
   call void asm unwind "", "~{memory},~{dirflag},~{fpsr},~{flags}"()
+  call void asm sideeffect "int3", "~{dirflag},~{fpsr},~{flags}"()
   ret void
 }
