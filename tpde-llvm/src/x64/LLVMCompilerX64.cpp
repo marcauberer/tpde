@@ -270,6 +270,51 @@ bool LLVMCompilerX64::compile_cond_br(const llvm::Instruction *inst,
 
 bool LLVMCompilerX64::compile_inline_asm(const llvm::CallBase *call) {
   auto inline_asm = llvm::cast<llvm::InlineAsm>(call->getCalledOperand());
+  if (inline_asm->getAsmString() == "movq\011%rbx, %rsi\012\011"
+                                    "cpuid\012\011"
+                                    "xchgq\011%rbx, %rsi\012\011" &&
+      (inline_asm->getConstraintString() ==
+           "={ax},={si},={cx},={dx},{ax},~{dirflag},~{fpsr},~{flags}" ||
+       inline_asm->getConstraintString() ==
+           "={ax},={si},={cx},={dx},{ax},{cx},~{dirflag},~{fpsr},~{flags}")) {
+    // SPEC hack.
+    ValueRef res = this->result_ref(call);
+    ValuePartRef ax = res.part(0);
+    ValuePartRef si = res.part(1);
+    ValuePartRef cx = res.part(2);
+    ValuePartRef dx = res.part(3);
+    ax.alloc_specific(AsmReg::AX);
+    si.alloc_specific(AsmReg::SI);
+    cx.alloc_specific(AsmReg::CX);
+    dx.alloc_specific(AsmReg::DX);
+    {
+      auto [src, src_part] = this->val_ref_single(call->getArgOperand(0));
+      src_part.reload_into_specific_fixed(AsmReg::AX, 4);
+    }
+    if (call->arg_size() >= 2) {
+      auto [src, src_part] = this->val_ref_single(call->getArgOperand(1));
+      src_part.reload_into_specific_fixed(AsmReg::CX, 4);
+    }
+    ASM(MOV64rr, FE_SI, FE_BX);
+    ASM(CPUID);
+    ASM(XCHG64rr, FE_SI, FE_BX);
+    return true;
+  }
+  if (inline_asm->getAsmString() == ".byte 0x0f, 0x01, 0xd0" &&
+      inline_asm->getConstraintString() ==
+          "={ax},={dx},{cx},~{dirflag},~{fpsr},~{flags}") {
+    // SPEC hack.
+    auto [src, src_part] = this->val_ref_single(call->getArgOperand(0));
+    src_part.load_to_specific(AsmReg::CX);
+    ValueRef res = this->result_ref(call);
+    ValuePartRef ax = res.part(0);
+    ValuePartRef dx = res.part(1);
+    ax.alloc_specific(AsmReg::AX);
+    dx.alloc_specific(AsmReg::DX);
+    ASM(XGETBV);
+    return true;
+  }
+
   if (inline_asm->isAlignStack() || !call->getType()->isVoidTy() ||
       call->arg_size() != 0) {
     return false;
