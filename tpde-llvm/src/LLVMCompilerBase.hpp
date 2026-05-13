@@ -186,6 +186,8 @@ struct LLVMCompilerBase : public LLVMCompiler,
     nearbyint,
     rintf,
     rint,
+    lround,
+    lroundf,
     memcpy,
     memset,
     memmove,
@@ -1243,6 +1245,8 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::nearbyint: name = "nearbyint"; break;
   case LibFunc::rintf: name = "rintf"; break;
   case LibFunc::rint: name = "rint"; break;
+  case LibFunc::lround: name = "lround"; break;
+  case LibFunc::lroundf: name = "lroundf"; break;
   case LibFunc::memcpy: name = "memcpy"; break;
   case LibFunc::memset: name = "memset"; break;
   case LibFunc::memmove: name = "memmove"; break;
@@ -4663,6 +4667,22 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     }
     auto res_vr = this->result_ref(inst);
     derived()->create_helper_call(ops, &res_vr, get_libfunc_sym(func));
+    return true;
+  }
+  case llvm::Intrinsic::lround: {
+    const llvm::Value *arg = inst->getArgOperand(0);
+    const auto is_double = arg->getType()->isDoubleTy();
+    if (!is_double && !arg->getType()->isFloatTy()) {
+      return false;
+    }
+    if (!inst->getType()->isIntegerTy() ||
+        inst->getType()->getIntegerBitWidth() > 64) {
+      return false;
+    }
+
+    LibFunc func = is_double ? LibFunc::lround : LibFunc::lroundf;
+    auto res_vr = this->result_ref(inst);
+    derived()->create_helper_call({&arg, 1}, &res_vr, get_libfunc_sym(func));
     return true;
   }
 #if LLVM_VERSION_MAJOR >= 21
