@@ -103,7 +103,7 @@ struct EncodingTargetX64 : EncodingTarget {
     const auto name =
         std::string_view{func->getSubtarget().getRegisterInfo()->getName(reg)};
     return (name == "EFLAGS" || name == "MXCSR" || name == "FPCW" ||
-            name == "SSP" || name == "RIP");
+            name == "FPSW" || name == "SSP" || name == "RIP");
   }
 
   bool reg_is_flags(const llvm::MCRegister reg) override {

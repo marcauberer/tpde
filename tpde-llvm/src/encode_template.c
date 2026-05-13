@@ -824,3 +824,4 @@ void prefetch_wl2(void* addr) { __builtin_prefetch(addr, 1, 2); }
 void prefetch_wl3(void* addr) { __builtin_prefetch(addr, 1, 3); }
 
 u64 TARGET_V1 readcyclecounter(void) { return __builtin_readcyclecounter(); }
+u32 TARGET_V1 getrounding(void) { return __builtin_flt_rounds(); }

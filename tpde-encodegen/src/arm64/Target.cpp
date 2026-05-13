@@ -291,9 +291,10 @@ void EncodingTargetArm64::get_inst_candidates(
   };
 
   const auto case_default = [&](std::string_view mnem_llvm,
-                                std::string_view mnem_disarm) {
+                                std::string_view mnem_disarm,
+                                std::string extra_ops = "") {
     if (std::string_view{Name} == mnem_llvm) {
-      handle_default(mnem_disarm);
+      handle_default(mnem_disarm, std::move(extra_ops));
     }
   };
 
@@ -304,6 +305,7 @@ void EncodingTargetArm64::get_inst_candidates(
   }
 
   case_default("MRS", "MRS");
+  case_default("MRS_FPCR", "MRS", ", 0xda20");
 
   const auto case_mov_shift = [&](std::string_view mnem_llvm,
                                   std::string_view mnem_disarm,

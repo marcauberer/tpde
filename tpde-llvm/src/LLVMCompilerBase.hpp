@@ -5155,6 +5155,8 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     ValueRef res = this->result_ref(inst);
     return derived()->encode_readcyclecounter(res.part(0));
   }
+  case llvm::Intrinsic::get_rounding:
+    return derived()->encode_getrounding(this->result_ref(inst).part(0));
   default: {
     return derived()->handle_intrin(inst);
   }
