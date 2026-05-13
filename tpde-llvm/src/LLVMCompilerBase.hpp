@@ -202,6 +202,22 @@ struct LLVMCompilerBase : public LLVMCompiler,
     sinf,
     cos,
     cosf,
+    tan,
+    tanf,
+    asin,
+    asinf,
+    acos,
+    acosf,
+    atan,
+    atanf,
+    atan2,
+    atan2f,
+    sinh,
+    sinhf,
+    cosh,
+    coshf,
+    tanh,
+    tanhf,
     log,
     logf,
     log2,
@@ -1243,6 +1259,22 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::sinf: name = "sinf"; break;
   case LibFunc::cos: name = "cos"; break;
   case LibFunc::cosf: name = "cosf"; break;
+  case LibFunc::tan: name = "tan"; break;
+  case LibFunc::tanf: name = "tanf"; break;
+  case LibFunc::asin: name = "asin"; break;
+  case LibFunc::asinf: name = "asinf"; break;
+  case LibFunc::acos: name = "acos"; break;
+  case LibFunc::acosf: name = "acosf"; break;
+  case LibFunc::atan: name = "atan"; break;
+  case LibFunc::atanf: name = "atanf"; break;
+  case LibFunc::atan2: name = "atan2"; break;
+  case LibFunc::atan2f: name = "atan2f"; break;
+  case LibFunc::sinh: name = "sinh"; break;
+  case LibFunc::sinhf: name = "sinhf"; break;
+  case LibFunc::cosh: name = "cosh"; break;
+  case LibFunc::coshf: name = "coshf"; break;
+  case LibFunc::tanh: name = "tanh"; break;
+  case LibFunc::tanhf: name = "tanhf"; break;
   case LibFunc::log: name = "log"; break;
   case LibFunc::logf: name = "logf"; break;
   case LibFunc::log2: name = "log2"; break;
@@ -4570,6 +4602,16 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
   case llvm::Intrinsic::powi:
   case llvm::Intrinsic::sin:
   case llvm::Intrinsic::cos:
+  case llvm::Intrinsic::tan:
+  case llvm::Intrinsic::asin:
+  case llvm::Intrinsic::acos:
+  case llvm::Intrinsic::atan:
+#if LLVM_VERSION_MAJOR >= 20
+  case llvm::Intrinsic::atan2:
+#endif
+  case llvm::Intrinsic::sinh:
+  case llvm::Intrinsic::cosh:
+  case llvm::Intrinsic::tanh:
   case llvm::Intrinsic::log:
   case llvm::Intrinsic::log10:
   case llvm::Intrinsic::log2:
@@ -4597,6 +4639,16 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     case powi: func = is_double ? LibFunc::powidf2 : LibFunc::powisf2; break;
     case sin: func = is_double ? LibFunc::sin : LibFunc::sinf; break;
     case cos: func = is_double ? LibFunc::cos : LibFunc::cosf; break;
+    case tan: func = is_double ? LibFunc::tan : LibFunc::tanf; break;
+    case asin: func = is_double ? LibFunc::asin : LibFunc::asinf; break;
+    case acos: func = is_double ? LibFunc::acos : LibFunc::acosf; break;
+    case atan: func = is_double ? LibFunc::atan : LibFunc::atanf; break;
+#if LLVM_VERSION_MAJOR >= 20
+    case atan2: func = is_double ? LibFunc::atan2 : LibFunc::atan2f; break;
+#endif
+    case sinh: func = is_double ? LibFunc::sinh : LibFunc::sinhf; break;
+    case cosh: func = is_double ? LibFunc::cosh : LibFunc::coshf; break;
+    case tanh: func = is_double ? LibFunc::tanh : LibFunc::tanhf; break;
     case log: func = is_double ? LibFunc::log : LibFunc::logf; break;
     case log2: func = is_double ? LibFunc::log2 : LibFunc::log2f; break;
     case log10: func = is_double ? LibFunc::log10 : LibFunc::log10f; break;
