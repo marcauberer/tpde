@@ -4783,6 +4783,12 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
       derived()->encode_fabsf32(this->val_ref(val).part(0), res_ref);
     } else if (ty->isFP128Ty()) {
       derived()->encode_fabsf128(this->val_ref(val).part(0), res_ref);
+    } else if (ty->isX86_FP80Ty()) {
+      if constexpr (requires { &Derived::fp80_abs; }) {
+        derived()->fp80_abs(this->val_ref(val).part(0), std::move(res_ref));
+        return true;
+      }
+      return false;
     } else {
       return false;
     }

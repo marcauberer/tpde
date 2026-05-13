@@ -190,6 +190,11 @@ struct LLVMCompilerX64 : tpde::x64::CompilerX64<LLVMAdaptor,
     ASM(FADDPrr, FE_ST(1), FE_ST(0));
     fp80_pop(res);
   }
+  void fp80_abs(ValuePart &&a, ValuePart &&res) {
+    fp80_push(std::move(a));
+    ASM(FABS);
+    fp80_pop(res);
+  }
   void fp80_cmp(llvm::CmpInst::Predicate pred,
                 ValuePart &&lhs,
                 ValuePart &&rhs,
