@@ -72,6 +72,12 @@ struct EncodingTargetArm64 : EncodingTarget {
     return false; // Flag preservation is not needed on AArch64.
   }
 
+  bool reg_is_sp(const llvm::MCRegister reg) override {
+    const auto name =
+        std::string_view{func->getSubtarget().getRegisterInfo()->getName(reg)};
+    return name == "SP" || name == "WSP";
+  }
+
   void generate_copy(std::string &buf,
                      unsigned indent,
                      unsigned bank,

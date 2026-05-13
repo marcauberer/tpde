@@ -115,6 +115,10 @@ struct EncodingTargetX64 : EncodingTarget {
     return name == "EFLAGS";
   }
 
+  bool reg_is_sp(const llvm::MCRegister reg) override {
+    return reg.isValid() && reg_is_gp(reg) && reg_id_from_mc_reg(reg) == 4;
+  }
+
   void generate_copy(std::string &buf,
                      unsigned indent,
                      unsigned bank,
