@@ -422,7 +422,8 @@ bool LLVMCompilerX64::compile_icmp(const llvm::Instruction *inst,
   auto lhs = this->val_ref(cmp->getOperand(0));
   auto rhs = this->val_ref(cmp->getOperand(1));
 
-  if (int_width == 128) {
+  if (int_width > 64) {
+    assert(int_width <= 128);
     // for 128 bit compares, we need to swap the operands sometimes
     if ((jump == Jump::ja) || (jump == Jump::jbe) || (jump == Jump::jle) ||
         (jump == Jump::jg)) {
@@ -432,28 +433,22 @@ bool LLVMCompilerX64::compile_icmp(const llvm::Instruction *inst,
 
     auto rhs_lo = rhs.part(0);
     auto rhs_hi = rhs.part(1);
+    auto lhs_hi = lhs.part(1).into_temporary();
     auto rhs_reg_lo = rhs_lo.load_to_reg();
     auto rhs_reg_hi = rhs_hi.load_to_reg();
 
     // Compare the ints using carried subtraction
-    ScratchReg res_scratch{this};
     if ((jump == Jump::je) || (jump == Jump::jne)) {
       // for eq,neq do something a bit quicker
-      ScratchReg scratch{this};
-      lhs.part(0).reload_into_specific_fixed(this, res_scratch.alloc_gp());
-      lhs.part(1).reload_into_specific_fixed(this, scratch.alloc_gp());
-
-      ASM(XOR64rr, res_scratch.cur_reg(), rhs_reg_lo);
-      ASM(XOR64rr, scratch.cur_reg(), rhs_reg_hi);
-      ASM(OR64rr, res_scratch.cur_reg(), scratch.cur_reg());
+      auto lhs_lo = lhs.part(0).into_temporary();
+      ASM(XOR64rr, lhs_lo.cur_reg(), rhs_reg_lo);
+      ASM(XOR64rr, lhs_hi.cur_reg(), rhs_reg_hi);
+      ASM(OR64rr, lhs_lo.cur_reg(), lhs_hi.cur_reg());
     } else {
       auto lhs_lo = lhs.part(0);
       auto lhs_reg_lo = lhs_lo.load_to_reg();
-      auto lhs_high_tmp =
-          lhs.part(1).reload_into_specific_fixed(this, res_scratch.alloc_gp());
-
       ASM(CMP64rr, lhs_reg_lo, rhs_reg_lo);
-      ASM(SBB64rr, lhs_high_tmp, rhs_reg_hi);
+      ASM(SBB64rr, lhs_hi.cur_reg(), rhs_reg_hi);
     }
   } else {
     ValuePartRef lhs_op = lhs.part(0);
