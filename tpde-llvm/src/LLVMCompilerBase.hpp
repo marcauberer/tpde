@@ -194,6 +194,8 @@ struct LLVMCompilerBase : public LLVMCompiler,
     powidf2,
     trunc,
     truncf,
+    fma,
+    fmaf,
     pow,
     powf,
     sin,
@@ -1218,6 +1220,8 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::powidf2: name = "__powidf2"; break;
   case LibFunc::trunc: name = "trunc"; break;
   case LibFunc::truncf: name = "truncf"; break;
+  case LibFunc::fma: name = "fma"; break;
+  case LibFunc::fmaf: name = "fmaf"; break;
   case LibFunc::pow: name = "pow"; break;
   case LibFunc::powf: name = "powf"; break;
   case LibFunc::sin: name = "sin"; break;
@@ -4544,6 +4548,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
   case llvm::Intrinsic::nearbyint:
   case llvm::Intrinsic::rint:
   case llvm::Intrinsic::trunc:
+  case llvm::Intrinsic::fma:
   case llvm::Intrinsic::pow:
   case llvm::Intrinsic::powi:
   case llvm::Intrinsic::sin:
@@ -4570,6 +4575,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
       break;
     case rint: func = is_double ? LibFunc::rint : LibFunc::rintf; break;
     case trunc: func = is_double ? LibFunc::trunc : LibFunc::truncf; break;
+    case fma: func = is_double ? LibFunc::fma : LibFunc::fmaf; break;
     case pow: func = is_double ? LibFunc::pow : LibFunc::powf; break;
     case powi: func = is_double ? LibFunc::powidf2 : LibFunc::powisf2; break;
     case sin: func = is_double ? LibFunc::sin : LibFunc::sinf; break;
