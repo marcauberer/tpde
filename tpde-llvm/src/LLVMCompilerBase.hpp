@@ -1370,6 +1370,9 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_inst(
     res[llvm::Instruction::FPTrunc] = {&Derived::compile_float_ext_trunc, 0};
     res[llvm::Instruction::FPExt] = {&Derived::compile_float_ext_trunc, 0};
     res[llvm::Instruction::PtrToInt] = {&Derived::compile_ptr_to_int, 0};
+#if LLVM_VERSION_MAJOR >= 22
+    res[llvm::Instruction::PtrToAddr] = {&Derived::compile_ptr_to_int, 0};
+#endif
     res[llvm::Instruction::IntToPtr] = {&Derived::compile_int_to_ptr, 0};
     res[llvm::Instruction::BitCast] = {&Derived::compile_bitcast, 0};
     // TODO: AddrSpaceCast
