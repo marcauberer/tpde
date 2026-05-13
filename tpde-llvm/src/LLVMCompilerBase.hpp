@@ -1136,24 +1136,37 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::global_init_to_data(
       // i32 trunc (i64 sub (i64 ptrtoint (ptr <someglobal> to i64), i64
       // ptrtoint (ptr <relocBase> to i64)))
       if (expr->getType()->isIntegerTy(32)) {
-        if (auto *sub = llvm::dyn_cast<llvm::ConstantExpr>(expr->getOperand(0));
-            sub && sub->getOpcode() == llvm::Instruction::Sub &&
-            sub->getType()->isIntegerTy(64)) {
-          auto *lhs = llvm::dyn_cast<llvm::ConstantExpr>(sub->getOperand(0));
-          auto *rhs = llvm::dyn_cast<llvm::ConstantExpr>(sub->getOperand(1));
-          if (lhs && rhs && lhs->getOpcode() == llvm::Instruction::PtrToInt &&
-              rhs->getOpcode() == llvm::Instruction::PtrToInt) {
-            if (rhs->getOperand(0) == reloc_base &&
-                llvm::isa<llvm::GlobalVariable>(lhs->getOperand(0))) {
-              auto ptr_sym =
-                  global_sym(llvm::cast<llvm::GlobalValue>(lhs->getOperand(0)));
-
-              relocs.push_back({off,
-                                static_cast<int32_t>(off),
-                                ptr_sym,
-                                RelocInfo::RELOC_PC32});
-              return true;
+        if (auto *sub = llvm::dyn_cast<llvm::SubOperator>(expr->getOperand(0));
+            sub && sub->getType()->isIntegerTy(64)) {
+          auto *lhs =
+              llvm::dyn_cast<llvm::PtrToIntOperator>(sub->getOperand(0));
+          auto *rhs =
+              llvm::dyn_cast<llvm::PtrToIntOperator>(sub->getOperand(1));
+          if (lhs && rhs) {
+            if (rhs->getOperand(0) != reloc_base) {
+              return false; // Can't handle generic pointer subtraction.
             }
+
+            llvm::Value *val = lhs->getOperand(0);
+            u64 ptr_delta = i32(off);
+            if (auto *gep = llvm::dyn_cast<llvm::GEPOperator>(val)) {
+              // Only handle canonical ptradd.
+              auto *idx = llvm::dyn_cast<llvm::ConstantInt>(gep->getOperand(1));
+              if (!gep->getSourceElementType()->isIntegerTy(8) || !idx ||
+                  idx->getType()->getIntegerBitWidth() > 64) {
+                return false;
+              }
+              val = gep->getOperand(0);
+              ptr_delta += idx->getSExtValue();
+            }
+            if (!llvm::isa<llvm::GlobalVariable>(val)) {
+              return false;
+            }
+            relocs.push_back({off,
+                              static_cast<int32_t>(ptr_delta),
+                              global_sym(llvm::cast<llvm::GlobalVariable>(val)),
+                              RelocInfo::RELOC_PC32});
+            return true;
           }
         }
       }
