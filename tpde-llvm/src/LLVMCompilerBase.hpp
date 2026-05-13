@@ -495,6 +495,7 @@ public:
   bool compile_atomicrmw(const llvm::Instruction *, const ValInfo &, u64);
   bool compile_fence(const llvm::Instruction *, const ValInfo &, u64);
   bool compile_freeze(const llvm::Instruction *, const ValInfo &, u64);
+  bool handle_call(const llvm::CallBase *, const ValInfo &, SymRef = {});
   bool compile_call(const llvm::Instruction *, const ValInfo &, u64);
   bool compile_select(const llvm::Instruction *, const ValInfo &, u64);
   bool compile_alloca(const llvm::Instruction *, const ValInfo &, u64);
@@ -3736,19 +3737,10 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_freeze(
 }
 
 template <typename Adaptor, typename Derived, typename Config>
-bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_call(
-    const llvm::Instruction *inst, const ValInfo &info, u64) {
-  const auto *call = llvm::cast<llvm::CallBase>(inst);
-  if (auto *intrin = llvm::dyn_cast<llvm::IntrinsicInst>(call)) {
-    return compile_intrin(intrin, info);
-  }
-
+bool LLVMCompilerBase<Adaptor, Derived, Config>::handle_call(
+    const llvm::CallBase *call, const ValInfo &, SymRef override_sym) {
   if (call->isMustTailCall() || call->hasOperandBundles()) {
     return false;
-  }
-
-  if (call->isInlineAsm()) {
-    return derived()->compile_inline_asm(call);
   }
 
   auto cb = derived()->create_call_builder(call);
@@ -3821,12 +3813,16 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_call(
     cb->add_arg(arg, this->adaptor->type_part_count(ty, ty_idx));
   }
 
-  llvm::Value *target = call->getCalledOperand();
-  if (auto *global = llvm::dyn_cast<llvm::GlobalValue>(target)) {
-    cb->call(global_sym(global));
+  if (override_sym.valid()) {
+    cb->call(override_sym);
   } else {
-    auto [_, tgt_vp] = this->val_ref_single(target);
-    cb->call(std::move(tgt_vp));
+    llvm::Value *target = call->getCalledOperand();
+    if (auto *global = llvm::dyn_cast<llvm::GlobalValue>(target)) {
+      cb->call(global_sym(global));
+    } else {
+      auto [_, tgt_vp] = this->val_ref_single(target);
+      cb->call(std::move(tgt_vp));
+    }
   }
 
   if (!call->getType()->isVoidTy()) {
@@ -3844,6 +3840,19 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_call(
   }
 
   return true;
+}
+
+template <typename Adaptor, typename Derived, typename Config>
+bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_call(
+    const llvm::Instruction *inst, const ValInfo &info, u64) {
+  const auto *call = llvm::cast<llvm::CallBase>(inst);
+  if (auto *intrin = llvm::dyn_cast<llvm::IntrinsicInst>(call)) {
+    return compile_intrin(intrin, info);
+  } else if (call->isInlineAsm()) {
+    return derived()->compile_inline_asm(call);
+  } else {
+    return derived()->handle_call(call, info);
+  }
 }
 
 template <typename Adaptor, typename Derived, typename Config>
@@ -4661,13 +4670,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     default: TPDE_UNREACHABLE("invalid library fp intrinsic");
     }
 
-    llvm::SmallVector<IRValueRef, 2> ops;
-    for (auto &op : inst->args()) {
-      ops.push_back(op);
-    }
-    auto res_vr = this->result_ref(inst);
-    derived()->create_helper_call(ops, &res_vr, get_libfunc_sym(func));
-    return true;
+    return derived()->handle_call(inst, info, get_libfunc_sym(func));
   }
   case llvm::Intrinsic::lround: {
     const llvm::Value *arg = inst->getArgOperand(0);
@@ -4681,9 +4684,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     }
 
     LibFunc func = is_double ? LibFunc::lround : LibFunc::lroundf;
-    auto res_vr = this->result_ref(inst);
-    derived()->create_helper_call({&arg, 1}, &res_vr, get_libfunc_sym(func));
-    return true;
+    return derived()->handle_call(inst, info, get_libfunc_sym(func));
   }
 #if LLVM_VERSION_MAJOR >= 21
   case llvm::Intrinsic::modf:
