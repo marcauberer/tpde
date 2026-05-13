@@ -214,6 +214,8 @@ struct LLVMCompilerBase : public LLVMCompiler,
     exp2f,
     modf,
     modff,
+    frexp,
+    frexpf,
     trunctfsf2,
     trunctfdf2,
     extendsftf2,
@@ -1240,6 +1242,8 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::exp2f: name = "exp2f"; break;
   case LibFunc::modf: name = "modf"; break;
   case LibFunc::modff: name = "modff"; break;
+  case LibFunc::frexp: name = "frexp"; break;
+  case LibFunc::frexpf: name = "frexpf"; break;
   case LibFunc::trunctfsf2: name = "__trunctfsf2"; break;
   case LibFunc::trunctfdf2: name = "__trunctfdf2"; break;
   case LibFunc::extendsftf2: name = "__extendsftf2"; break;
@@ -4597,11 +4601,23 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     return true;
   }
 #if LLVM_VERSION_MAJOR >= 21
-  case llvm::Intrinsic::modf: {
+  case llvm::Intrinsic::modf:
+#endif
+  case llvm::Intrinsic::frexp: {
     llvm::Value *arg = inst->getArgOperand(0);
     const auto is_double = arg->getType()->isDoubleTy();
     if (!is_double && !arg->getType()->isFloatTy()) {
       return false;
+    }
+
+    LibFunc func;
+    switch (intrin_id) {
+      using enum llvm::Intrinsic::IndependentIntrinsics;
+#if LLVM_VERSION_MAJOR >= 21
+    case modf: func = is_double ? LibFunc::modf : LibFunc::modff; break;
+#endif
+    case frexp: func = is_double ? LibFunc::frexp : LibFunc::frexpf; break;
+    default: TPDE_UNREACHABLE("invalid library fp intrinsic");
     }
 
     auto cb = derived()->create_call_builder(inst);
@@ -4609,7 +4625,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
       return false;
     }
 
-    // modf is tricky. The LLVM intrinsic returns two values as struct. The C
+    // This is tricky. The LLVM intrinsic returns two values as struct. The C
     // function, however, returns a single value in a register and the second
     // value via an output parameter to an address. We have to allocate a stack
     // slot (we reuse the spill slot of the result) and pass the address of this
@@ -4632,11 +4648,10 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
     cb->add_arg(std::move(int_part_slot_vp),
                 tpde::CCAssignment{.bank = Config::GP_BANK, .size = 8});
 
-    cb->call(get_libfunc_sym(is_double ? LibFunc::modf : LibFunc::modff));
+    cb->call(get_libfunc_sym(func));
     cb->add_ret(res.part(0), {});
     return true;
   }
-#endif
   case llvm::Intrinsic::minnum:
   case llvm::Intrinsic::maxnum:
   case llvm::Intrinsic::copysign: {
