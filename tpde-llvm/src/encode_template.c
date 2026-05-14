@@ -536,6 +536,7 @@ v2f64 TARGET_V1 fmuladdv2f64(v2f64 a, v2f64 b, v2f64 c) { return a * b + c; }
 
 float TARGET_V1 copysignf32(float a, float b) { return __builtin_copysignf(a, b); }
 double TARGET_V1 copysignf64(double a, double b) { return __builtin_copysign(a, b); }
+fp128 TARGET_V1 copysignf128(fp128 a, fp128 b) { return __builtin_copysignf128(a, b); }
 
 float TARGET_V1 sqrtf32(float a) { return __builtin_sqrtf(a); }
 double TARGET_V1 sqrtf64(double a) { return __builtin_sqrt(a); }

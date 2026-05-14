@@ -4817,23 +4817,12 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
   case llvm::Intrinsic::maxnum:
   case llvm::Intrinsic::copysign: {
     // Floating-point intrinsics with two operands
-    const auto is_double = inst->getType()->isDoubleTy();
-    if (!is_double && !inst->getType()->isFloatTy()) {
-      return false;
-    }
-
     using EncodeFnTy = bool (Derived::*)(
         GenericValuePart &&, GenericValuePart &&, ValuePart &&);
     EncodeFnTy fn;
-    if (is_double) {
-      switch (intrin_id) {
-        using enum llvm::Intrinsic::IndependentIntrinsics;
-      case minnum: fn = &Derived::encode_minnumf64; break;
-      case maxnum: fn = &Derived::encode_maxnumf64; break;
-      case copysign: fn = &Derived::encode_copysignf64; break;
-      default: TPDE_UNREACHABLE("invalid binary fp intrinsic");
-      }
-    } else {
+    switch (info.type) {
+      using enum LLVMBasicValType;
+    case f32:
       switch (intrin_id) {
         using enum llvm::Intrinsic::IndependentIntrinsics;
       case minnum: fn = &Derived::encode_minnumf32; break;
@@ -4841,6 +4830,24 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
       case copysign: fn = &Derived::encode_copysignf32; break;
       default: TPDE_UNREACHABLE("invalid binary fp intrinsic");
       }
+      break;
+    case f64:
+      switch (intrin_id) {
+        using enum llvm::Intrinsic::IndependentIntrinsics;
+      case minnum: fn = &Derived::encode_minnumf64; break;
+      case maxnum: fn = &Derived::encode_maxnumf64; break;
+      case copysign: fn = &Derived::encode_copysignf64; break;
+      default: TPDE_UNREACHABLE("invalid binary fp intrinsic");
+      }
+      break;
+    case f128:
+      switch (intrin_id) {
+        using enum llvm::Intrinsic::IndependentIntrinsics;
+      case copysign: fn = &Derived::encode_copysignf128; break;
+      default: return false;
+      }
+      break;
+    default: return false;
     }
 
     auto lhs = this->val_ref(inst->getOperand(0));
