@@ -1495,15 +1495,20 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_ret(
     llvm::Type *ret_ty = retval->getType();
     if (ret_ty->isIntegerTy()) {
       if (unsigned width = ret_ty->getIntegerBitWidth(); width % 32 != 0) {
-        assert(width < 64 && "non-i128 multi-word int should be illegal");
         unsigned dst_width = width < 32 ? 32 : 64;
         llvm::AttributeList attrs = this->adaptor->cur_func->getAttributes();
         llvm::AttributeSet ret_attrs = attrs.getRetAttrs();
         if (ret_attrs.hasAttribute(llvm::Attribute::ZExt)) {
+          if (width > 64) {
+            return false;
+          }
           auto [vr, vpr] = this->val_ref_single(retval);
           rb.add(std::move(vpr).into_extended(false, width, dst_width), {});
           handled = true;
         } else if (ret_attrs.hasAttribute(llvm::Attribute::SExt)) {
+          if (width > 64) {
+            return false;
+          }
           auto [vr, vpr] = this->val_ref_single(retval);
           rb.add(std::move(vpr).into_extended(true, width, dst_width), {});
           handled = true;
@@ -1661,6 +1666,10 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_load_generic(
   case ptr: num_bits = 64; goto load_single_integer;
 
   case i128: {
+    num_bits = load->getType()->getIntegerBitWidth();
+    if (num_bits != 128) {
+      return false;
+    }
     ValueRef res = this->result_ref(load);
     derived()->encode_loadi128(std::move(ptr_op), res.part(0), res.part(1));
     break;
@@ -1899,6 +1908,10 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_store_generic(
     derived()->encode_storei64(std::move(ptr_op), op_ref.part(0));
     break;
   case i128:
+    num_bits = op_val->getType()->getIntegerBitWidth();
+    if (num_bits != 128) {
+      return false;
+    }
     derived()->encode_storei128(
         std::move(ptr_op), op_ref.part(0), op_ref.part(1));
     break;
@@ -2023,8 +2036,9 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_store(
 template <typename Adaptor, typename Derived, typename Config>
 bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
     const llvm::Instruction *inst, const ValInfo &, IntBinaryOp op) {
-  assert(inst->getType()->getIntegerBitWidth() == 128 &&
-         "non-i128 multi-word integer should not be legal");
+  if (inst->getType()->getIntegerBitWidth() != 128) {
+    return false;
+  }
   llvm::Value *lhs_op = inst->getOperand(0);
   llvm::Value *rhs_op = inst->getOperand(1);
 
@@ -2699,6 +2713,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_trunc(
     // contains the lowest bits.
     res_vr.part(0).set_value(src_vr.part(0));
     return true;
+  case i128: return false;
   case v8i1:
   case v16i1:
   case v32i1:
@@ -3793,7 +3808,13 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::handle_call(
         arg.ext_bits = op->getType()->getIntegerBitWidth();
       }
       break;
-    case LLVMBasicValType::i128: arg.byval_align = 16; break;
+    case LLVMBasicValType::i128:
+      arg.byval_align = 16;
+      if (call->paramHasAttr(i, llvm::Attribute::AttrKind::ZExt) ||
+          call->paramHasAttr(i, llvm::Attribute::AttrKind::SExt)) {
+        return false;
+      }
+      break;
     case LLVMBasicValType::f80: {
       auto [vr, vpr] = this->val_ref_single(op);
       tpde::CCAssignment cca{

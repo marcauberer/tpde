@@ -430,6 +430,9 @@ bool LLVMCompilerX64::compile_icmp(const llvm::Instruction *inst,
       std::swap(lhs, rhs);
       jump = swap_jump(jump);
     }
+    if (int_width < 128) {
+      return false;
+    }
 
     auto rhs_lo = rhs.part(0);
     auto rhs_hi = rhs.part(1);

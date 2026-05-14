@@ -351,7 +351,11 @@ bool LLVMCompilerArm64::compile_icmp(const llvm::Instruction *inst,
   auto lhs = this->val_ref(cmp->getOperand(0));
   auto rhs = this->val_ref(cmp->getOperand(1));
 
-  if (int_width == 128) {
+  if (int_width > 64) {
+    assert(int_width <= 128);
+    if (int_width < 128) {
+      return false;
+    }
     auto lhs_lo = lhs.part(0);
     auto lhs_hi = lhs.part(1);
     auto rhs_lo = rhs.part(0);
