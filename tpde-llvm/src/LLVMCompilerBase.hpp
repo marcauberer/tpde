@@ -1599,6 +1599,23 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_load_generic(
     return true;
   }
 
+  using EncodeFnTy = bool (Derived::*)(GenericValuePart &&, ValuePart &&);
+  static constexpr auto int_fns = []() consteval {
+    std::array<EncodeFnTy[2], 8> res{};
+    res[0][0] = &Derived::encode_loadi8_zext;
+    res[0][1] = &Derived::encode_loadi8_sext;
+    res[1][0] = &Derived::encode_loadi16_zext;
+    res[1][1] = &Derived::encode_loadi16_sext;
+    res[2][0] = &Derived::encode_loadi24;
+    res[3][0] = &Derived::encode_loadi32_zext;
+    res[3][1] = &Derived::encode_loadi32_sext;
+    res[4][0] = &Derived::encode_loadi40;
+    res[5][0] = &Derived::encode_loadi48;
+    res[6][0] = &Derived::encode_loadi56;
+    res[7][0] = &Derived::encode_loadi64;
+    return res;
+  }();
+
   unsigned num_bits;
   bool sext = false;
   const llvm::Instruction *target = load;
@@ -1634,23 +1651,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_load_generic(
     }
 
   load_single_integer:
-    using EncodeFnTy = bool (Derived::*)(GenericValuePart &&, ValuePart &&);
-    static constexpr auto fns = []() consteval {
-      std::array<EncodeFnTy[2], 8> res{};
-      res[0][0] = &Derived::encode_loadi8_zext;
-      res[0][1] = &Derived::encode_loadi8_sext;
-      res[1][0] = &Derived::encode_loadi16_zext;
-      res[1][1] = &Derived::encode_loadi16_sext;
-      res[2][0] = &Derived::encode_loadi24;
-      res[3][0] = &Derived::encode_loadi32_zext;
-      res[3][1] = &Derived::encode_loadi32_sext;
-      res[4][0] = &Derived::encode_loadi40;
-      res[5][0] = &Derived::encode_loadi48;
-      res[6][0] = &Derived::encode_loadi56;
-      res[7][0] = &Derived::encode_loadi64;
-      return res;
-    }();
-    EncodeFnTy fn = fns[(num_bits - 1) / 8][sext];
+    EncodeFnTy fn = int_fns[(num_bits - 1) / 8][sext];
     (derived()->*fn)(std::move(ptr_op), this->result_ref(target).part(0));
     break;
   }
@@ -1667,11 +1668,17 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_load_generic(
 
   case i128: {
     num_bits = load->getType()->getIntegerBitWidth();
-    if (num_bits != 128) {
-      return false;
-    }
     ValueRef res = this->result_ref(load);
-    derived()->encode_loadi128(std::move(ptr_op), res.part(0), res.part(1));
+    if (num_bits == 128) {
+      derived()->encode_loadi128(std::move(ptr_op), res.part(0), res.part(1));
+      break;
+    }
+    EncodeFnTy fn0 = int_fns[7][0]; // i64
+    EncodeFnTy fn1 = int_fns[(num_bits - 64 - 1) / 8][0];
+    // TODO: fuse expr; not easy, because we lose the GVP
+    AsmReg ptr = this->gval_as_reg(ptr_op);
+    (derived()->*fn0)(typename GenericValuePart::Expr{ptr, 0}, res.part(0));
+    (derived()->*fn1)(typename GenericValuePart::Expr{ptr, 8}, res.part(1));
     break;
   }
   case f32:
@@ -1856,6 +1863,21 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_store_generic(
   // TODO: don't recompute this, this is currently computed for every val part
   auto [ty, ty_idx] = this->adaptor->lower_type(op_val->getType());
 
+  using EncodeFnTy =
+      bool (Derived::*)(GenericValuePart &&, GenericValuePart &&);
+  static constexpr auto int_fns = []() consteval {
+    std::array<EncodeFnTy, 8> res{};
+    res[0] = &Derived::encode_storei8;
+    res[1] = &Derived::encode_storei16;
+    res[2] = &Derived::encode_storei24;
+    res[3] = &Derived::encode_storei32;
+    res[4] = &Derived::encode_storei40;
+    res[5] = &Derived::encode_storei48;
+    res[6] = &Derived::encode_storei56;
+    res[7] = &Derived::encode_storei64;
+    return res;
+  }();
+
   unsigned num_bits;
   switch (ty) {
     using enum LLVMBasicValType;
@@ -1867,32 +1889,9 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_store_generic(
     assert(op_val->getType()->isIntegerTy());
     num_bits = op_val->getType()->getIntegerBitWidth();
   store_single_integer:
-    switch (tpde::util::align_up(num_bits, 8)) {
-    case 1:
-    case 8: derived()->encode_storei8(std::move(ptr_op), op_ref.part(0)); break;
-    case 16:
-      derived()->encode_storei16(std::move(ptr_op), op_ref.part(0));
-      break;
-    case 24:
-      derived()->encode_storei24(std::move(ptr_op), op_ref.part(0));
-      break;
-    case 32:
-      derived()->encode_storei32(std::move(ptr_op), op_ref.part(0));
-      break;
-    case 40:
-      derived()->encode_storei40(std::move(ptr_op), op_ref.part(0));
-      break;
-    case 48:
-      derived()->encode_storei48(std::move(ptr_op), op_ref.part(0));
-      break;
-    case 56:
-      derived()->encode_storei56(std::move(ptr_op), op_ref.part(0));
-      break;
-    case 64:
-      derived()->encode_storei64(std::move(ptr_op), op_ref.part(0));
-      break;
-    default: return false;
-    }
+    // TODO: zero-extend if num_bits is not a multiple of 8.
+    EncodeFnTy fn = int_fns[(num_bits - 1) / 8];
+    (derived()->*fn)(std::move(ptr_op), op_ref.part(0));
     break;
   }
   case v8i1:
@@ -1907,14 +1906,22 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_store_generic(
   case ptr:
     derived()->encode_storei64(std::move(ptr_op), op_ref.part(0));
     break;
-  case i128:
+  case i128: {
     num_bits = op_val->getType()->getIntegerBitWidth();
-    if (num_bits != 128) {
-      return false;
+    if (num_bits == 128) {
+      derived()->encode_storei128(
+          std::move(ptr_op), op_ref.part(0), op_ref.part(1));
+      break;
     }
-    derived()->encode_storei128(
-        std::move(ptr_op), op_ref.part(0), op_ref.part(1));
+    // TODO: zero-extend if num_bits is not a multiple of 8.
+    EncodeFnTy fn0 = int_fns[7]; // i64
+    EncodeFnTy fn1 = int_fns[(num_bits - 64 - 1) / 8];
+    // TODO: fuse expr; not easy, because we lose the GVP
+    AsmReg ptr = this->gval_as_reg(ptr_op);
+    (derived()->*fn0)(typename GenericValuePart::Expr{ptr, 0}, op_ref.part(0));
+    (derived()->*fn1)(typename GenericValuePart::Expr{ptr, 8}, op_ref.part(1));
     break;
+  }
   case f32:
     derived()->encode_storef32(std::move(ptr_op), op_ref.part(0));
     break;
