@@ -2043,9 +2043,8 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_store(
 template <typename Adaptor, typename Derived, typename Config>
 bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
     const llvm::Instruction *inst, const ValInfo &, IntBinaryOp op) {
-  if (inst->getType()->getIntegerBitWidth() != 128) {
-    return false;
-  }
+  unsigned int_width = inst->getType()->getIntegerBitWidth();
+  assert(int_width > 64 && int_width <= 128);
   llvm::Value *lhs_op = inst->getOperand(0);
   llvm::Value *rhs_op = inst->getOperand(1);
 
@@ -2057,6 +2056,10 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
       lf = op.is_signed() ? LibFunc::divti3 : LibFunc::udivti3;
     } else {
       lf = op.is_signed() ? LibFunc::modti3 : LibFunc::umodti3;
+    }
+
+    if (int_width != 128) {
+      return false; // TODO: extend parameters
     }
 
     std::array<IRValueRef, 2> args{lhs_op, rhs_op};
@@ -2075,6 +2078,12 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
   }
 
   if (op.is_shift()) {
+    ValuePartRef lhs_hi = lhs.part(1);
+    if (int_width != 128 && op.needs_lhs_ext()) {
+      bool sext = op.is_signed(); // Essentially just ashr.
+      lhs_hi = std::move(lhs_hi).into_extended(sext, int_width - 64, 64);
+    }
+
     ValuePartRef shift_amt = rhs.part(0);
     if (shift_amt.is_const()) {
       u64 imm1 = shift_amt.const_data()[0] & 0b111'1111; // amt
@@ -2083,7 +2092,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
         if (op == IntBinaryOp::shl) {
           derived()->encode_shli128_lt64(
               lhs.part(0),
-              lhs.part(1),
+              std::move(lhs_hi),
               ValuePartRef(this, imm1, 1, Config::GP_BANK),
               ValuePartRef(this, imm2, 1, Config::GP_BANK),
               res.part(0),
@@ -2091,7 +2100,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
         } else if (op == IntBinaryOp::shr) {
           derived()->encode_shri128_lt64(
               lhs.part(0),
-              lhs.part(1),
+              std::move(lhs_hi),
               ValuePartRef(this, imm1, 1, Config::GP_BANK),
               ValuePartRef(this, imm2, 1, Config::GP_BANK),
               res.part(0),
@@ -2100,7 +2109,7 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
           assert(op == IntBinaryOp::ashr);
           derived()->encode_ashri128_lt64(
               lhs.part(0),
-              lhs.part(1),
+              std::move(lhs_hi),
               ValuePartRef(this, imm1, 1, Config::GP_BANK),
               ValuePartRef(this, imm2, 1, Config::GP_BANK),
               res.part(0),
@@ -2116,14 +2125,14 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
               res.part(1));
         } else if (op == IntBinaryOp::shr) {
           derived()->encode_shri128_ge64(
-              lhs.part(1),
+              std::move(lhs_hi),
               ValuePartRef(this, imm1, 1, Config::GP_BANK),
               res.part(0),
               res.part(1));
         } else {
           assert(op == IntBinaryOp::ashr);
           derived()->encode_ashri128_ge64(
-              lhs.part(1),
+              std::move(lhs_hi),
               ValuePartRef(this, imm1, 1, Config::GP_BANK),
               res.part(0),
               res.part(1));
@@ -2132,20 +2141,20 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
     } else {
       if (op == IntBinaryOp::shl) {
         derived()->encode_shli128(lhs.part(0),
-                                  lhs.part(1),
+                                  std::move(lhs_hi),
                                   std::move(shift_amt),
                                   res.part(0),
                                   res.part(1));
       } else if (op == IntBinaryOp::shr) {
         derived()->encode_shri128(lhs.part(0),
-                                  lhs.part(1),
+                                  std::move(lhs_hi),
                                   std::move(shift_amt),
                                   res.part(0),
                                   res.part(1));
       } else {
         assert(op == IntBinaryOp::ashr);
         derived()->encode_ashri128(lhs.part(0),
-                                   lhs.part(1),
+                                   std::move(lhs_hi),
                                    std::move(shift_amt),
                                    res.part(0),
                                    res.part(1));
