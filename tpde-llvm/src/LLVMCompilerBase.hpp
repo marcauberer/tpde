@@ -2115,6 +2115,21 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_binary_op_i128(
               res.part(0),
               res.part(1));
         }
+      } else if (imm1 == 64) {
+        // For shifts by 64, we just need to move one part to another.
+        if (op == IntBinaryOp::shl) {
+          res.part(0).set_value(ValuePartRef(this, 0, 8, Config::GP_BANK));
+          res.part(1).set_value(lhs.part(0));
+        } else if (op == IntBinaryOp::shr) {
+          res.part(0).set_value(std::move(lhs_hi));
+          res.part(1).set_value(ValuePartRef(this, 0, 8, Config::GP_BANK));
+        } else {
+          assert(op == IntBinaryOp::ashr);
+          (void)lhs_hi.cur_reg_or_load(); // Force into reg for get_unowned_ref.
+          derived()->encode_fill_with_sign64(lhs_hi.get_unowned_ref(),
+                                             res.part(1));
+          res.part(0).set_value(std::move(lhs_hi));
+        }
       } else {
         imm1 -= 64;
         if (op == IntBinaryOp::shl) {

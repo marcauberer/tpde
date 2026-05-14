@@ -215,7 +215,6 @@ define i80 @lshr_i80_64(i80 %0) {
 ; X64:         push rbp
 ; X64-NEXT:    mov rbp, rsp
 ; X64-NEXT:    movzx esi, si
-; X64-NEXT:    shr rsi, 0x0
 ; X64-NEXT:    xor eax, eax
 ; X64-NEXT:    mov qword ptr [rbp - 0x38], rax
 ; X64-NEXT:    mov rax, rsi
@@ -225,8 +224,7 @@ define i80 @lshr_i80_64(i80 %0) {
 ;
 ; ARM64-LABEL: <lshr_i80_64>:
 ; ARM64:         ubfx x1, x1, #0, #16
-; ARM64-NEXT:    lsr x1, x1, #0
-; ARM64-NEXT:    mov x2, xzr
+; ARM64-NEXT:    mov w2, #0x0 // =0
 ; ARM64-NEXT:    mov x0, x1
 ; ARM64-NEXT:    mov x1, x2
 ; ARM64-NEXT:    ret
@@ -328,7 +326,6 @@ define i128 @lshr_i128_64(i128 %0) {
 ; X64-LABEL: <lshr_i128_64>:
 ; X64:         push rbp
 ; X64-NEXT:    mov rbp, rsp
-; X64-NEXT:    shr rsi, 0x0
 ; X64-NEXT:    xor eax, eax
 ; X64-NEXT:    mov qword ptr [rbp - 0x38], rax
 ; X64-NEXT:    mov rax, rsi
@@ -337,8 +334,7 @@ define i128 @lshr_i128_64(i128 %0) {
 ; X64-NEXT:    ret
 ;
 ; ARM64-LABEL: <lshr_i128_64>:
-; ARM64:         lsr x1, x1, #0
-; ARM64-NEXT:    mov x2, xzr
+; ARM64:         mov w2, #0x0 // =0
 ; ARM64-NEXT:    mov x0, x1
 ; ARM64-NEXT:    mov x1, x2
 ; ARM64-NEXT:    ret

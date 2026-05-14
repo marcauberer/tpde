@@ -193,16 +193,14 @@ entry:
 
 define i80 @shl_i80_64(i80 %0) {
 ; X64-LABEL: <shl_i80_64>:
-; X64:         shl rdi, 0x0
-; X64-NEXT:    xor eax, eax
+; X64:         xor eax, eax
 ; X64-NEXT:    mov rdx, rdi
 ; X64-NEXT:    ret
 ;
 ; ARM64-LABEL: <shl_i80_64>:
 ; ARM64:         stp x29, x30, [sp, #-0xb0]!
 ; ARM64-NEXT:    mov x29, sp
-; ARM64-NEXT:    lsr x0, x0, #0
-; ARM64-NEXT:    mov x2, xzr
+; ARM64-NEXT:    mov w2, #0x0 // =0
 ; ARM64-NEXT:    str x0, [x29, #0xa8]
 ; ARM64-NEXT:    mov x0, x2
 ; ARM64-NEXT:    ldr x1, [x29, #0xa8]
@@ -303,16 +301,14 @@ entry:
 
 define i128 @shl_i128_64(i128 %0) {
 ; X64-LABEL: <shl_i128_64>:
-; X64:         shl rdi, 0x0
-; X64-NEXT:    xor eax, eax
+; X64:         xor eax, eax
 ; X64-NEXT:    mov rdx, rdi
 ; X64-NEXT:    ret
 ;
 ; ARM64-LABEL: <shl_i128_64>:
 ; ARM64:         stp x29, x30, [sp, #-0xb0]!
 ; ARM64-NEXT:    mov x29, sp
-; ARM64-NEXT:    lsr x0, x0, #0
-; ARM64-NEXT:    mov x2, xzr
+; ARM64-NEXT:    mov w2, #0x0 // =0
 ; ARM64-NEXT:    str x0, [x29, #0xa8]
 ; ARM64-NEXT:    mov x0, x2
 ; ARM64-NEXT:    ldr x1, [x29, #0xa8]

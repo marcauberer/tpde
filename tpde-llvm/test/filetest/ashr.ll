@@ -215,18 +215,22 @@ entry:
 
 define i80 @ashr_i80_64(i80 %0) {
 ; X64-LABEL: <ashr_i80_64>:
-; X64:         movsx rsi, si
+; X64:         push rbp
+; X64-NEXT:    mov rbp, rsp
+; X64-NEXT:    movsx rsi, si
 ; X64-NEXT:    mov rax, rsi
-; X64-NEXT:    sar rax, 0x0
-; X64-NEXT:    sar rsi, 0x3f
-; X64-NEXT:    mov rdx, rsi
+; X64-NEXT:    sar rax, 0x3f
+; X64-NEXT:    mov qword ptr [rbp - 0x38], rax
+; X64-NEXT:    mov rax, rsi
+; X64-NEXT:    mov rdx, qword ptr [rbp - 0x38]
+; X64-NEXT:    pop rbp
 ; X64-NEXT:    ret
 ;
 ; ARM64-LABEL: <ashr_i80_64>:
 ; ARM64:         sxth x1, w1
-; ARM64-NEXT:    asr x2, x1, #0
-; ARM64-NEXT:    asr x1, x1, #63
-; ARM64-NEXT:    mov x0, x2
+; ARM64-NEXT:    asr x2, x1, #63
+; ARM64-NEXT:    mov x0, x1
+; ARM64-NEXT:    mov x1, x2
 ; ARM64-NEXT:    ret
 entry:
     %1 = ashr i80 %0, 64
@@ -321,16 +325,20 @@ entry:
 
 define i128 @ashr_i128_64(i128 %0) {
 ; X64-LABEL: <ashr_i128_64>:
-; X64:         mov rax, rsi
-; X64-NEXT:    sar rax, 0x0
-; X64-NEXT:    sar rsi, 0x3f
-; X64-NEXT:    mov rdx, rsi
+; X64:         push rbp
+; X64-NEXT:    mov rbp, rsp
+; X64-NEXT:    mov rax, rsi
+; X64-NEXT:    sar rax, 0x3f
+; X64-NEXT:    mov qword ptr [rbp - 0x38], rax
+; X64-NEXT:    mov rax, rsi
+; X64-NEXT:    mov rdx, qword ptr [rbp - 0x38]
+; X64-NEXT:    pop rbp
 ; X64-NEXT:    ret
 ;
 ; ARM64-LABEL: <ashr_i128_64>:
-; ARM64:         asr x2, x1, #0
-; ARM64-NEXT:    asr x1, x1, #63
-; ARM64-NEXT:    mov x0, x2
+; ARM64:         asr x2, x1, #63
+; ARM64-NEXT:    mov x0, x1
+; ARM64-NEXT:    mov x1, x2
 ; ARM64-NEXT:    ret
 entry:
     %1 = ashr i128 %0, 64
