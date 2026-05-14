@@ -353,17 +353,18 @@ bool LLVMCompilerArm64::compile_icmp(const llvm::Instruction *inst,
 
   if (int_width > 64) {
     assert(int_width <= 128);
-    if (int_width < 128) {
-      return false;
-    }
     auto lhs_lo = lhs.part(0);
     auto lhs_hi = lhs.part(1);
     auto rhs_lo = rhs.part(0);
     auto rhs_hi = rhs.part(1);
+    if (int_width < 128) {
+      lhs_hi = std::move(lhs_hi).into_extended(is_signed, int_width - 64, 64);
+      rhs_hi = std::move(rhs_hi).into_extended(is_signed, int_width - 64, 64);
+    }
     auto lhs_reg_lo = lhs_lo.load_to_reg();
-    auto lhs_reg_hi = lhs_hi.load_to_reg();
+    auto lhs_reg_hi = lhs_hi.cur_reg_or_load();
     auto rhs_reg_lo = rhs_lo.load_to_reg();
-    auto rhs_reg_hi = rhs_hi.load_to_reg();
+    auto rhs_reg_hi = rhs_hi.cur_reg_or_load();
     if ((jump == Jump::Jeq) || (jump == Jump::Jne)) {
       // Use CCMP for equality
       ASM(CMPx, lhs_reg_lo, rhs_reg_lo);
