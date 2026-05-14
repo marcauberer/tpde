@@ -2713,7 +2713,10 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_trunc(
     // contains the lowest bits.
     res_vr.part(0).set_value(src_vr.part(0));
     return true;
-  case i128: return false;
+  case i128:
+    res_vr.part(0).set_value(src_vr.part(0));
+    res_vr.part(1).set_value(src_vr.part(1));
+    return true;
   case v8i1:
   case v16i1:
   case v32i1:
@@ -2772,35 +2775,42 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_int_ext(
 
   unsigned src_width = src_val->getType()->getIntegerBitWidth();
   unsigned dst_width = inst->getType()->getIntegerBitWidth();
-  assert(dst_width >= src_width);
+  assert(dst_width > src_width);
 
   auto src_ref = this->val_ref(src_val);
-
-  ValuePartRef low = src_ref.part(0);
-  if (src_width < 64) {
-    unsigned ext_width = dst_width <= 64 ? dst_width : 64;
-    low = std::move(low).into_extended(sign, src_width, ext_width);
-  } else if (src_width > 64) {
-    return false;
-  }
-
   auto res = this->result_ref(inst);
 
-  if (dst_width == 128) {
-    auto res_ref_high = res.part(1);
-
-    if (sign) {
-      if (!low.has_reg()) {
-        low.load_to_reg();
-      }
-      derived()->encode_fill_with_sign64(low.get_unowned_ref(), res_ref_high);
-    } else {
-      res_ref_high.set_value(ValuePart{u64{0}, 8, res_ref_high.bank()});
+  if (src_width <= 64) {
+    ValuePartRef low = src_ref.part(0);
+    if (src_width < 64) {
+      unsigned ext_width = dst_width <= 64 ? dst_width : 64;
+      low = std::move(low).into_extended(sign, src_width, ext_width);
     }
+    if (dst_width > 64) {
+      auto res_ref_high = res.part(1);
+
+      if (sign) {
+        if (!low.has_reg()) {
+          low.load_to_reg();
+        }
+        derived()->encode_fill_with_sign64(low.get_unowned_ref(), res_ref_high);
+      } else {
+        res_ref_high.set_value(ValuePart{u64{0}, 8, res_ref_high.bank()});
+      }
+    }
+
+    res.part(0).set_value(std::move(low));
+    return true;
   }
 
-  res.part(0).set_value(std::move(low));
-  return true;
+  if (src_width < 128 && dst_width <= 128) {
+    res.part(0).set_value(src_ref.part(0));
+    res.part(1).set_value(
+        src_ref.part(1).into_extended(sign, src_width - 64, 64));
+    return true;
+  }
+
+  return false;
 }
 
 template <typename Adaptor, typename Derived, typename Config>
