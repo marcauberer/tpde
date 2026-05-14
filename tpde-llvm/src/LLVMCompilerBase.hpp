@@ -223,6 +223,7 @@ struct LLVMCompilerBase : public LLVMCompiler,
     log,
     logf,
     logl,
+    logf128,
     log2,
     log2f,
     log10,
@@ -1284,6 +1285,7 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::log: name = "log"; break;
   case LibFunc::logf: name = "logf"; break;
   case LibFunc::logl: name = "logl"; break;
+  case LibFunc::logf128: name = "logf128"; break;
   case LibFunc::log2: name = "log2"; break;
   case LibFunc::log2f: name = "log2f"; break;
   case LibFunc::log10: name = "log10"; break;
@@ -4695,8 +4697,14 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_intrin(
   case llvm::Intrinsic::exp:
   case llvm::Intrinsic::exp2: {
     // Floating-point intrinsics that can be mapped directly to libcalls.
-    if (inst->getType()->isX86_FP80Ty() && intrin_id == llvm::Intrinsic::log) {
-      return derived()->handle_call(inst, info, get_libfunc_sym(LibFunc::logl));
+    if (intrin_id == llvm::Intrinsic::log) {
+      if (inst->getType()->isX86_FP80Ty()) {
+        return derived()->handle_call(
+            inst, info, get_libfunc_sym(LibFunc::logl));
+      } else if (inst->getType()->isFP128Ty()) {
+        return derived()->handle_call(
+            inst, info, get_libfunc_sym(LibFunc::logf128));
+      }
     }
     const auto is_double = inst->getType()->isDoubleTy();
     if (!is_double && !inst->getType()->isFloatTy()) {
