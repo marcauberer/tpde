@@ -874,6 +874,7 @@ void EncodingTargetArm64::get_inst_candidates(
   case_default("FMOVWSr", "FMOVsw");
   case_default("FMOVXDr", "FMOVdx");
   case_default("UMOVvi64", "UMOVxd");
+  case_default("UMOVvi16_idx0", "UMOVwh");
   case_default("INSvi64gpr", "INSdx");
 
   case_default("CASB", "CASB");
