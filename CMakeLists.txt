@@ -36,6 +36,12 @@ option(TPDE_ENABLE_ASAN "Enable AddressSanitizer" ${TPDE_ENABLE_ASAN_default})
 option(TPDE_BUILD_DOCS "Build documentation" OFF)
 option(TPDE_ENABLE_EH "Build with exception handling" OFF)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16)
+    # Workaround for GCC 16 miscompile of arrays of member function pointers.
+    # Bug report: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=126310
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:--param;vrp-cstload-limit=0>")
+endif ()
+
 # warnings
 if (MSVC)
     add_compile_options(/W4 /WX)
