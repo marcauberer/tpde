@@ -137,7 +137,7 @@ if (TPDE_ENABLE_ENCODEGEN OR TPDE_ENABLE_LLVM)
     foreach (VERSION ${TPDE_LLVM_SUPPORTED_VERSIONS})
         if (NOT LLVM_FOUND)
             # "Optional" to suppress CMake warnings as we probe multiple versions.
-            find_package(LLVM ${VERSION} OPTIONAL CONFIG)
+            find_package(LLVM ${VERSION} QUIET CONFIG)
         endif ()
     endforeach ()
     if (NOT LLVM_FOUND)
