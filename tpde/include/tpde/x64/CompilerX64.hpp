@@ -283,7 +283,13 @@ struct CompilerX64 : BaseTy<Adaptor, Derived, Config> {
 
   // TODO(ts): make this dependent on the number of callee-saved regs of the
   // current function or if there is a call in the function?
-  static constexpr u32 NUM_FIXED_ASSIGNMENTS[PlatformConfig::NUM_BANKS] = {5,
+  //
+  // Keep at most 4 GP registers permanently fixed. Some intrinsic encodings
+  // (e.g. 128-bit multiply-with-overflow) need up to 10 of the 14 allocatable
+  // GP registers live at once; with 5 fixed assignments only 9 remain,
+  // which makes select_reg_evict()/ScratchWrapper unable to find a register
+  // to evict and triggers "ran out of registers for scratch registers".
+  static constexpr u32 NUM_FIXED_ASSIGNMENTS[PlatformConfig::NUM_BANKS] = {4,
                                                                            6};
 
   static constexpr u32 MaxStaticAllocaSize = 0x10000000;
