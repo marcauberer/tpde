@@ -88,48 +88,13 @@ define i128 @smul_i128_0(i128 %0, i128 %1) {
 ; X64-LABEL: <smul_i128_0>:
 ; X64:         push rbp
 ; X64-NEXT:    mov rbp, rsp
-; X64-NEXT:    push rbx
-; X64-NEXT:    mov qword ptr [rbp - 0x40], rdx
-; X64-NEXT:    mov rbx, rsi
-; X64-NEXT:    sar rbx, 0x3f
-; X64-NEXT:    imul rbx, qword ptr [rbp - 0x40]
-; X64-NEXT:    mov rax, rdi
-; X64-NEXT:    mul qword ptr [rbp - 0x40]
-; X64-NEXT:    mov r8, rdx
-; X64-NEXT:    mov r9, rax
-; X64-NEXT:    mov rax, rsi
-; X64-NEXT:    mul qword ptr [rbp - 0x40]
-; X64-NEXT:    mov r10, rdx
-; X64-NEXT:    add r8, rax
-; X64-NEXT:    adc r10, rbx
-; X64-NEXT:    mov rbx, r10
-; X64-NEXT:    sar rbx, 0x3f
-; X64-NEXT:    mov r11, rcx
-; X64-NEXT:    sar r11, 0x3f
-; X64-NEXT:    imul r11, rdi
-; X64-NEXT:    mov rax, rdi
-; X64-NEXT:    mul rcx
-; X64-NEXT:    mov rdi, rdx
-; X64-NEXT:    add r8, rax
-; X64-NEXT:    adc rdi, r11
-; X64-NEXT:    mov r11, rdi
-; X64-NEXT:    sar r11, 0x3f
-; X64-NEXT:    add rdi, r10
-; X64-NEXT:    adc r11, rbx
-; X64-NEXT:    mov rax, rsi
-; X64-NEXT:    imul rcx
-; X64-NEXT:    add rax, rdi
-; X64-NEXT:    adc rdx, r11
-; X64-NEXT:    mov rcx, r8
-; X64-NEXT:    sar rcx, 0x3f
-; X64-NEXT:    xor rdx, rcx
-; X64-NEXT:    xor rcx, rax
-; X64-NEXT:    xor esi, esi
-; X64-NEXT:    or rcx, rdx
-; X64-NEXT:    setne sil
-; X64-NEXT:    mov rax, r9
-; X64-NEXT:    mov rdx, r8
-; X64-NEXT:    pop rbx
+; X64-NEXT:    sub rsp, 0x50
+; X64-NEXT:    lea rax, [rbp - 0x40]
+; X64-NEXT:    mov r8, rax
+; X64-NEXT:    call <L0>
+; X64-NEXT:    R_X86_64_PLT32 __muloti4-0x4
+; X64-NEXT:  <L0>:
+; X64-NEXT:    add rsp, 0x50
 ; X64-NEXT:    pop rbp
 ; X64-NEXT:    ret
 entry:
@@ -142,47 +107,15 @@ define i1 @smul_i128_1(i128 %0, i128 %1) {
 ; X64-LABEL: <smul_i128_1>:
 ; X64:         push rbp
 ; X64-NEXT:    mov rbp, rsp
-; X64-NEXT:    push rbx
-; X64-NEXT:    mov qword ptr [rbp - 0x40], rdx
-; X64-NEXT:    mov rbx, rsi
-; X64-NEXT:    sar rbx, 0x3f
-; X64-NEXT:    imul rbx, qword ptr [rbp - 0x40]
-; X64-NEXT:    mov rax, rdi
-; X64-NEXT:    mul qword ptr [rbp - 0x40]
-; X64-NEXT:    mov r8, rdx
-; X64-NEXT:    mov r9, rax
-; X64-NEXT:    mov rax, rsi
-; X64-NEXT:    mul qword ptr [rbp - 0x40]
-; X64-NEXT:    mov r10, rdx
-; X64-NEXT:    add r8, rax
-; X64-NEXT:    adc r10, rbx
-; X64-NEXT:    mov rbx, r10
-; X64-NEXT:    sar rbx, 0x3f
-; X64-NEXT:    mov r11, rcx
-; X64-NEXT:    sar r11, 0x3f
-; X64-NEXT:    imul r11, rdi
-; X64-NEXT:    mov rax, rdi
-; X64-NEXT:    mul rcx
-; X64-NEXT:    mov rdi, rdx
-; X64-NEXT:    add r8, rax
-; X64-NEXT:    adc rdi, r11
-; X64-NEXT:    mov r11, rdi
-; X64-NEXT:    sar r11, 0x3f
-; X64-NEXT:    add rdi, r10
-; X64-NEXT:    adc r11, rbx
-; X64-NEXT:    mov rax, rsi
-; X64-NEXT:    imul rcx
-; X64-NEXT:    add rax, rdi
-; X64-NEXT:    adc rdx, r11
-; X64-NEXT:    mov rcx, r8
-; X64-NEXT:    sar rcx, 0x3f
-; X64-NEXT:    xor rdx, rcx
-; X64-NEXT:    xor rcx, rax
-; X64-NEXT:    xor esi, esi
-; X64-NEXT:    or rcx, rdx
-; X64-NEXT:    setne sil
-; X64-NEXT:    mov eax, esi
-; X64-NEXT:    pop rbx
+; X64-NEXT:    sub rsp, 0x50
+; X64-NEXT:    lea rax, [rbp - 0x40]
+; X64-NEXT:    mov r8, rax
+; X64-NEXT:    call <L0>
+; X64-NEXT:    R_X86_64_PLT32 __muloti4-0x4
+; X64-NEXT:  <L0>:
+; X64-NEXT:    movzx ecx, byte ptr [rbp - 0x40]
+; X64-NEXT:    mov eax, ecx
+; X64-NEXT:    add rsp, 0x50
 ; X64-NEXT:    pop rbp
 ; X64-NEXT:    ret
 entry:

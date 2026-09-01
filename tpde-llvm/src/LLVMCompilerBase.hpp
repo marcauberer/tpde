@@ -174,6 +174,7 @@ struct LLVMCompilerBase : public LLVMCompiler,
     udivti3,
     modti3,
     umodti3,
+    muloti4,
     fmod,
     fmodf,
     floorf,
@@ -1236,6 +1237,7 @@ typename LLVMCompilerBase<Adaptor, Derived, Config>::SymRef
   case LibFunc::udivti3: name = "__udivti3"; break;
   case LibFunc::modti3: name = "__modti3"; break;
   case LibFunc::umodti3: name = "__umodti3"; break;
+  case LibFunc::muloti4: name = "__muloti4"; break;
   case LibFunc::fmod: name = "fmod"; break;
   case LibFunc::fmodf: name = "fmodf"; break;
   case LibFunc::floorf: name = "floorf"; break;
@@ -5429,15 +5431,57 @@ bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_is_fpclass(
 template <typename Adaptor, typename Derived, typename Config>
 bool LLVMCompilerBase<Adaptor, Derived, Config>::compile_overflow_intrin(
     const llvm::IntrinsicInst *inst, OverflowOp op) {
-  ValueRef lhs = this->val_ref(inst->getOperand(0));
-  ValueRef rhs = this->val_ref(inst->getOperand(1));
-  ValueRef res = this->result_ref(inst);
-
   auto *ty = inst->getOperand(0)->getType();
   if (!ty->isIntegerTy()) {
     return false;
   }
   const auto width = ty->getIntegerBitWidth();
+
+  if (width == 128 && op == OverflowOp::smul) {
+    // Signed 128-bit multiply-with-overflow needs up to 10 live GPRs when
+    // inlined via encodegen (encode_of_mul_i128), which can exceed the
+    // registers left over once the permanently-fixed register assignments
+    // (NUM_FIXED_ASSIGNMENTS) are accounted for (see #45). This is a rare
+    // operation, so lower it to a call to the compiler-rt/libgcc helper
+    // instead, rather than shrinking NUM_FIXED_ASSIGNMENTS and thereby the
+    // register budget of every function.
+    auto cb = derived()->create_call_builder();
+    if (!cb) {
+      return false;
+    }
+    cb->add_arg(typename Derived::CallArg{inst->getOperand(0)});
+    cb->add_arg(typename Derived::CallArg{inst->getOperand(1)});
+
+    ValueRef res = this->result_ref(inst);
+    assert(res.assignment()->part_count == 3);
+
+    // __muloti4's third argument is a pointer to an int that receives the
+    // overflow flag. Reuse the result's own (currently unused) spill slot
+    // for the overflow part as storage for this out-parameter: the part's
+    // logical size is 1 byte (i1), but the assignment reserves a full
+    // max_part_size stride (>= 8 bytes) per part, so writing a 4-byte int
+    // there does not clobber the lo/hi parts. The overflow part is then
+    // read back from the same memory whenever it's used.
+    tpde::AssignmentPartRef of_part{res.assignment(), 2};
+    this->allocate_spill_slot(of_part);
+    of_part.set_stack_valid();
+    GenericValuePart of_slot = derived()->val_spill_slot(of_part);
+    (void)derived()->gval_expr_as_reg(of_slot);
+    ValuePart of_slot_vp;
+    of_slot_vp.set_value(derived(),
+                         std::move(std::get<ScratchReg>(of_slot.state)));
+    cb->add_arg(std::move(of_slot_vp),
+               tpde::CCAssignment{.bank = Config::GP_BANK, .size = 8});
+
+    cb->call(get_libfunc_sym(LibFunc::muloti4));
+    cb->add_ret(res.part(0), {});
+    cb->add_ret(res.part(1), {});
+    return true;
+  }
+
+  ValueRef lhs = this->val_ref(inst->getOperand(0));
+  ValueRef rhs = this->val_ref(inst->getOperand(1));
+  ValueRef res = this->result_ref(inst);
 
   if (width == 128) {
     if (!derived()->handle_overflow_intrin_128(op,
